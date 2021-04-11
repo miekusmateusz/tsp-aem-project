@@ -12,6 +12,7 @@ def generate_random_solution(distance_matrx: np.ndarray, number_of_iterations=10
         path_l = calculate_path_length(random_nodes, distance_matrx)
         if path_l < best_result[1] or best_result[1] == -1:
             best_result = (random_nodes, path_l)
+    return best_result[0]
 
 
 def calculate_path_length(nodes: list, distance_matrix: np.ndarray):

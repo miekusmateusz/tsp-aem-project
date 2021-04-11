@@ -16,8 +16,8 @@ def steep_node_replacement(initial_solution: list, distance_matrix: np.ndarray):
         for ind2 in range(ind1 + 1, len(initial_solution)):
             possible_replace_in_path_operations.append((ind1, ind2))
 
-    while True:
-        current_delta = 0
+    for _ in range(100):
+        current_delta = None
         operation_to_perform = None
         for op1 in possible_replace_outside_path_operations:
             index_to_remove = op1[0]
@@ -37,7 +37,7 @@ def steep_node_replacement(initial_solution: list, distance_matrix: np.ndarray):
             else:
                 delta = cached_delta_values[(0, node_to_remove_prev, node_to_remove, node_to_remove_next, node_to_add)]
 
-            if delta < current_delta:
+            if current_delta is None or delta < current_delta:
                 operation_to_perform = (0, op1)
                 current_delta = delta
         for op2 in possible_replace_in_path_operations:
@@ -66,13 +66,13 @@ def steep_node_replacement(initial_solution: list, distance_matrix: np.ndarray):
                 delta = cached_delta_values[
                     (1, first_node_prev, first_node, first_node_next, second_node_prev, second_node, second_node_next)]
 
-            if delta < current_delta:
+            if current_delta is None or delta < current_delta:
                 operation_to_perform = (1, op2)
                 current_delta = delta
-
         if operation_to_perform is None:
             break
         else:
+
             if operation_to_perform[0] == 0:
                 rem = operation_to_perform[1][0]
                 add = operation_to_perform[1][1]
@@ -82,6 +82,7 @@ def steep_node_replacement(initial_solution: list, distance_matrix: np.ndarray):
             elif operation_to_perform[0] == 1:
                 first = operation_to_perform[1][0]
                 second = operation_to_perform[1][1]
+
                 tmp = int(initial_solution[first])
                 initial_solution[first] = int(initial_solution[second])
                 initial_solution[second] = int(tmp)
@@ -102,8 +103,8 @@ def steep_edge_replacement(initial_solution: list, distance_matrix: np.ndarray):
     # creation of all possible EDGE replacements moves IN CURRENT PATH as a list of tuples (first_node_ind, second_node_ind)
     possible_replace_in_path_indexes_outcomes = generate_all_edge_replacement_possibilities(initial_solution)
 
-    while True:
-        current_delta = 0
+    for _ in range(100):
+        current_delta = None
         operation_to_perform = None
         for op1 in possible_replace_outside_path_operations:
             index_to_remove = op1[0]
@@ -123,18 +124,23 @@ def steep_edge_replacement(initial_solution: list, distance_matrix: np.ndarray):
             else:
                 delta = cached_delta_values[(0, node_to_remove_prev, node_to_remove, node_to_remove_next, node_to_add)]
 
-            if delta < current_delta:
+            if current_delta is None or delta < current_delta:
                 operation_to_perform = (0, op1)
                 current_delta = delta
         for outcome_indexes in possible_replace_in_path_indexes_outcomes:
+            remove_moves = outcome_indexes[0][0]
+            add_moves = outcome_indexes[0][1]
 
-            sol = [initial_solution[idx] for idx in outcome_indexes]
-            if sol not in cached_delta_values:
-                delta = calculate_path_length(sol, distance_matrix)
-                cached_delta_values[sol] = delta
+            sol = [initial_solution[idx] for idx in outcome_indexes[1]]
+            if hash(str(sol)) not in cached_delta_values:
+                delta = distance_matrix[initial_solution[add_moves[0][0]], initial_solution[add_moves[0][1]]] + \
+                        distance_matrix[initial_solution[add_moves[1][0]], initial_solution[add_moves[1][1]]] - \
+                        distance_matrix[initial_solution[remove_moves[0][0]], initial_solution[remove_moves[0][1]]] - \
+                        distance_matrix[initial_solution[remove_moves[1][0]], initial_solution[remove_moves[1][1]]]
+                cached_delta_values[hash(str(sol))] = delta
             else:
-                delta = cached_delta_values[sol]
-            if delta < current_delta:
+                delta = cached_delta_values[hash(str(sol))]
+            if current_delta is None or delta < current_delta:
                 operation_to_perform = (1, sol)
                 current_delta = delta
 
@@ -148,7 +154,7 @@ def steep_edge_replacement(initial_solution: list, distance_matrix: np.ndarray):
                 initial_solution[rem] = int(potential_nodes[add])
                 potential_nodes[add] = int(tmp)
             elif operation_to_perform[0] == 1:
-                initial_solution = operation_to_perform[1]
+                initial_solution = list(operation_to_perform[1])
 
     final_path = calculate_path_length(initial_solution, distance_matrix)
     return initial_solution, final_path
@@ -165,7 +171,16 @@ def get_neighbours_indices_in_list(index, list_length):
 def generate_edge_replacement_for_span(nodes_list: list, span: int, result: list):
     x = 2
     for i in range(len(nodes_list)):
+
         copy_list = list(nodes_list) + nodes_list[0:span]
+        list_slice = copy_list[i:i + span]
+
+        left_end_neighs = get_neighbours_indices_in_list(list_slice[0], len(nodes_list))
+        right_end_neighs = get_neighbours_indices_in_list(list_slice[-1], len(nodes_list))
+
+        remove_ops = [(left_end_neighs[0], list_slice[0]), (list_slice[-1], right_end_neighs[1])]
+        add_ops = [(left_end_neighs[0], list_slice[::-1][0]), (list_slice[::-1][-1], right_end_neighs[1])]
+
         copy_list[i:i + span] = copy_list[i:i + span][::-1]
         if i > len(nodes_list) - span:
             res = copy_list[x:len(copy_list) - (span - x)]
@@ -175,7 +190,7 @@ def generate_edge_replacement_for_span(nodes_list: list, span: int, result: list
 
         res = shift_list_to_have_zero_index_on_first_place(res)
         if res not in result:
-            result.append(res)
+            result.append([[remove_ops, add_ops], res])
 
     return result
 
@@ -194,9 +209,3 @@ def shift_list_to_have_zero_index_on_first_place(nodes_indexes_list: list):
     numpy_list = np.array(nodes_indexes_list)
 
     return list(np.roll(numpy_list, -zero_index))
-
-
-x = {}
-x[1, 3, 4, 5] = 's'
-x[1, 2] = 'l'
-print(x)
